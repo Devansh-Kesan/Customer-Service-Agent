@@ -1,0 +1,15 @@
+[fastapi]
+host = "0.0.0.0"  # Makes API accessible on all network interfaces
+port = 3000  # Port for FastAPI
+workers = 4  # Number of worker processes
+reload = true  # Enable reload in development mode
+title = "Customer Service Compliance API"
+description = "API for analyzing customer service calls for compliance, sentiment, and categorization."
+
+[logging]
+log_file = "service.log"
+min_log_level = "DEBUG"
+log_rotation = "00:00"
+log_compression = "zip"
+log_address = "tcp://127.0.0.1:5555"
+
