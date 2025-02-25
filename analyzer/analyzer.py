@@ -11,7 +11,7 @@ from utils.yaml_loader import load_yaml
 
 from .compliance import ComplianceChecker
 
-# from .diarization import DiarizationAnalyzer
+from .diarization import DiarizationAnalyzer
 from .pii_profanity import SensitiveInfoDetector
 from .sentiment_speed import SentimentAnalyzer
 from .transcription import Transcriber
@@ -59,7 +59,7 @@ class CallComplianceAnalyzer:
             self.compliance = ComplianceChecker()
             self.pii_detector = SensitiveInfoDetector()
             self.sentiment = SentimentAnalyzer()
-            # self.diarization_analyzer = DiarizationAnalyzer(hf_token)
+            self.diarization_analyzer = DiarizationAnalyzer(hf_token)
 
             if yaml_file is None:
                 parent_dir = Path(__file__).parent.parent
@@ -151,23 +151,23 @@ class CallComplianceAnalyzer:
             }
 
             sentiment_result = self.sentiment.analyze(text)
-            # diarized_segments = self.diarization_analyzer.perform_diarization(
-            #     audio_file,
-            # )
-            # diarized_with_roles = self.diarization_analyzer.assign_roles_with_context(
-            #     diarized_segments,
-            #     transcript_for_diarization,
-            # )
-            # diarization_metrics = self.diarization_analyzer.calculate_metrics(
-            #     diarized_with_roles,
-            # )
+            diarized_segments = self.diarization_analyzer.perform_diarization(
+                audio_file,
+            )
+            diarized_with_roles = self.diarization_analyzer.assign_roles_with_context(
+                diarized_segments,
+                transcript_for_diarization,
+            )
+            diarization_metrics = self.diarization_analyzer.calculate_metrics(
+                diarized_with_roles,
+            )
 
             result = {
                 "masked_transcript": masked_text,
                 "detected_pii": detected_pii,
                 "compliance_markers": compliance_markers,
                 "sentiment": sentiment_result,
-                # "diarization_metrics": diarization_metrics,
+                "diarization_metrics": diarization_metrics,
                 "category": self.categorize_call(text),
             }
         except (ValueError, OSError, RuntimeError) as e:
