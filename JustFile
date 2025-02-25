@@ -7,8 +7,6 @@ default:
 # setup environment and install dependencies
 setup:
     uv sync
-    pip install ffmpeg-python
-    echo "Setup complete with FFmpeg installed"
 
 # start fastapi server
 start-backend-server:
@@ -33,11 +31,18 @@ start-all:
     uv run frontend.py > frontend_server.log 2>&1 &
     @echo "All servers started! Check respective log files for details."
     @echo "To stop all servers, use: just stop-all"
+    uv run 
 
 # stop all servers
 stop-all:
-    @echo "Stopping all servers..."
+    #!/bin/bash
+    echo "Stopping all servers..."
     pkill -f "uv run logging_server.py" || true
     pkill -f "uv run start_server.py" || true
     pkill -f "uv run frontend.py" || true
-    @echo "All servers stopped."
+    echo "All servers stopped."
+
+
+# view mkdocs:
+documentation:
+    uv run mkdocs serve
