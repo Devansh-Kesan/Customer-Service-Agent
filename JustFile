@@ -21,3 +21,23 @@ start-logging-server:
 # start frontend server
 start-frontend-server:
     uv run frontend.py
+
+# start all servers (in background with proper logging)
+start-all:
+    @echo "Starting all servers..."
+    @echo "Starting logging server..."
+    uv run logging_server.py > logging_server.log 2>&1 &
+    @echo "Starting backend server..."
+    uv run start_server.py > backend_server.log 2>&1 &
+    @echo "Starting frontend server..."
+    uv run frontend.py > frontend_server.log 2>&1 &
+    @echo "All servers started! Check respective log files for details."
+    @echo "To stop all servers, use: just stop-all"
+
+# stop all servers
+stop-all:
+    @echo "Stopping all servers..."
+    pkill -f "uv run logging_server.py" || true
+    pkill -f "uv run start_server.py" || true
+    pkill -f "uv run frontend.py" || true
+    @echo "All servers stopped."
