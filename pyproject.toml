@@ -13,6 +13,7 @@ dependencies = [
     "httpx>=0.28.1",
     "librosa>=0.10.2.post1",
     "loguru>=0.7.3",
+    "mkdocs-material>=9.6.5",
     "openai-whisper>=20240930",
     "pyannote-audio>=3.3.2",
     "pydantic>=2.10.6",
