@@ -12,6 +12,7 @@ from pathlib import Path
 import aiofiles
 import toml
 import zmq
+import os
 from fastapi import FastAPI, HTTPException, UploadFile
 from loguru import logger
 
@@ -67,7 +68,10 @@ pii_detector = SensitiveInfoDetector()
 transcriber = Transcriber()
 compliance_checker = ComplianceChecker()
 sentiment_analyzer = SentimentAnalyzer()
-diarization_analyzer = DiarizationAnalyzer()
+
+hf_token = os.getenv("HF_TOKEN")
+
+diarization_analyzer = DiarizationAnalyzer(hf_token)
 
 # Cache for storing transcriptions
 transcription_cache = {}
