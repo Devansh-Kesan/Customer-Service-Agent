@@ -17,8 +17,7 @@ from loguru import logger
 
 from analyzer.analyzer import CallComplianceAnalyzer
 from analyzer.compliance import ComplianceChecker
-
-# from analyzer.diarization import DiarizationAnalyzer
+from analyzer.diarization import DiarizationAnalyzer
 from analyzer.pii_profanity import SensitiveInfoDetector
 from analyzer.sentiment_speed import SentimentAnalyzer
 from analyzer.transcription import Transcriber
@@ -33,11 +32,13 @@ FASTAPI_CONFIG = config["fastapi"]
 logger_config = LoggerConfig()
 context = zmq.Context()
 
+
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
     """Set up and tear down application-level resources.
 
     Args:
+    ----
         _: The FastAPI application instance.
 
     """
@@ -50,6 +51,7 @@ async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
         yield
     finally:
         context.term()
+
 
 # Initialize FastAPI with settings from config.toml
 app = FastAPI(
@@ -65,18 +67,21 @@ pii_detector = SensitiveInfoDetector()
 transcriber = Transcriber()
 compliance_checker = ComplianceChecker()
 sentiment_analyzer = SentimentAnalyzer()
-# diarization_analyzer = DiarizationAnalyzer()
+diarization_analyzer = DiarizationAnalyzer()
 
 # Cache for storing transcriptions
 transcription_cache = {}
+
 
 def get_file_hash(file_data: bytes) -> str:
     """Generate a SHA-256 hash for the uploaded file to use as a cache key.
 
     Args:
+    ----
         file_data: The binary content of the file.
 
     Returns:
+    -------
         A hexadecimal SHA-256 hash of the file data.
 
     """
@@ -87,20 +92,25 @@ def get_file_hash(file_data: bytes) -> str:
         logger.exception("Failed to generate file hash")
         raise HTTPException(status_code=500, detail="Hash generation failed") from e
 
+
 def raise_transcription_error() -> None:
     """Raise a standardized transcription error."""
     raise HTTPException(status_code=500, detail="Transcription failed")
+
 
 async def get_transcription(file: UploadFile) -> dict:
     """Retrieve transcription from cache or transcribe if not cached.
 
     Args:
+    ----
         file: The uploaded audio file.
 
     Returns:
+    -------
         The transcription data.
 
     Raises:
+    ------
         HTTPException: If transcription fails.
 
     """
@@ -120,14 +130,17 @@ async def get_transcription(file: UploadFile) -> dict:
     logger.success("Transcription completed successfully")
     return transcribed_data
 
+
 @app.post("/analyze")
 async def analyze_call(file: UploadFile) -> dict:
     """Analyze the uploaded call audio for full compliance and categorization.
 
     Args:
+    ----
         file (UploadFile): The uploaded audio file.
 
     Returns:
+    -------
         dict: Analysis results including compliance and categorization.
 
     """
@@ -141,14 +154,17 @@ async def analyze_call(file: UploadFile) -> dict:
 
     return analyzer.full_analysis(audio_path, transcribed_data, "Completed")
 
+
 @app.post("/transcribe")
 async def transcribe_call(file: UploadFile) -> dict:
     """Transcribe the uploaded audio file.
 
     Args:
+    ----
         file: The uploaded audio file.
 
     Returns:
+    -------
         The transcription data.
 
     """
@@ -159,15 +175,18 @@ async def transcribe_call(file: UploadFile) -> dict:
         logger.exception("Transcription endpoint failed")
         raise HTTPException(status_code=500, detail="Transcription failed") from e
 
+
 @app.post("/compliance")
 async def check_compliance(file: UploadFile) -> dict:
     """Check the uploaded audio file for compliance with greetings,
     closing, and disclaimers.
 
     Args:
+    ----
         file: The uploaded audio file.
 
     Returns:
+    -------
         Detected compliance phrases.
 
     """
@@ -184,13 +203,16 @@ async def check_compliance(file: UploadFile) -> dict:
 
         detected = {
             "detected_greetings": compliance_checker.detect_phrases(
-                transcribed_text, compliance_checker.greetings,
+                transcribed_text,
+                compliance_checker.greetings,
             ),
             "detected_closing": compliance_checker.detect_phrases(
-                transcribed_text, compliance_checker.closing,
+                transcribed_text,
+                compliance_checker.closing,
             ),
             "detected_disclaimers": compliance_checker.detect_phrases(
-                transcribed_text, compliance_checker.disclaimers,
+                transcribed_text,
+                compliance_checker.disclaimers,
             ),
         }
 
@@ -198,18 +220,22 @@ async def check_compliance(file: UploadFile) -> dict:
     except (ValueError, KeyError) as e:
         logger.exception("Compliance check failed")
         raise HTTPException(
-            status_code=500, detail="Compliance check error",
+            status_code=500,
+            detail="Compliance check error",
         ) from e
     return detected
+
 
 @app.post("/profanity")
 async def check_profanity(file: UploadFile) -> dict:
     """Detect profanity in the transcribed text of the uploaded audio file.
 
     Args:
+    ----
         file: The uploaded audio file.
 
     Returns:
+    -------
         Detected profanity information.
 
     """
@@ -226,18 +252,22 @@ async def check_profanity(file: UploadFile) -> dict:
     except (ValueError, KeyError) as e:
         logger.exception("Profanity check failed")
         raise HTTPException(
-            status_code=500, detail="Profanity check error",
+            status_code=500,
+            detail="Profanity check error",
         ) from e
     return {"Profanity": result}
+
 
 @app.post("/pii")
 async def check_pii(file: UploadFile) -> dict:
     """Detect personally identifiable information (PII) in the transcribed text.
 
     Args:
+    ----
         file: The uploaded audio file.
 
     Returns:
+    -------
         Detected PII information.
 
     """
@@ -256,14 +286,17 @@ async def check_pii(file: UploadFile) -> dict:
         raise HTTPException(status_code=500, detail="PII check error") from e
     return result
 
+
 @app.post("/mask_transcript")
 async def masked_transcript(file: UploadFile) -> dict:
     """Mask sensitive information (PII and profanity) in the transcribed text.
 
     Args:
+    ----
         file: The uploaded audio file.
 
     Returns:
+    -------
         Masked transcript.
 
     """
@@ -291,14 +324,17 @@ async def masked_transcript(file: UploadFile) -> dict:
         raise HTTPException(status_code=500, detail="Masking error") from e
     return {"masked_text": masked_text}
 
+
 @app.post("/sentiment_analysis")
 async def sentiment_analysis(file: UploadFile) -> dict:
     """Perform sentiment analysis on the transcribed text.
 
     Args:
+    ----
         file: The uploaded audio file.
 
     Returns:
+    -------
         Sentiment analysis results.
 
     """
@@ -315,18 +351,22 @@ async def sentiment_analysis(file: UploadFile) -> dict:
     except (ValueError, KeyError) as e:
         logger.exception("Sentiment analysis failed")
         raise HTTPException(
-            status_code=500, detail="Sentiment analysis error",
+            status_code=500,
+            detail="Sentiment analysis error",
         ) from e
     return result
+
 
 @app.post("/categorization")
 async def categorize_call(file: UploadFile) -> dict:
     """Categorize the uploaded call based on its transcribed text.
 
     Args:
+    ----
         file: The uploaded audio file.
 
     Returns:
+    -------
         Call categorization results.
 
     """
@@ -343,42 +383,47 @@ async def categorize_call(file: UploadFile) -> dict:
     except (ValueError, KeyError) as e:
         logger.exception("Categorization failed")
         raise HTTPException(
-            status_code=500, detail="Categorization error",
+            status_code=500,
+            detail="Categorization error",
         ) from e
     return {"Call_Category": result}
 
-# @app.post("/diarization")
-# async def diarize_call(file: UploadFile) -> dict:
-#     """Perform speaker diarization on the uploaded audio file.
 
-#     Args:
-#         file: The uploaded audio file.
+@app.post("/diarization")
+async def diarize_call(file: UploadFile) -> dict:
+    """Perform speaker diarization on the uploaded audio file.
 
-#     Returns:
-#         Diarization metrics and results.
+    Args:
+    ----
+        file: The uploaded audio file.
 
-#     """
-#     try:
-#         logger.info(f"Call diarization for file: {file.filename}")
-#         transcribed_data = await get_transcription(file)
+    Returns:
+    -------
+        Diarization metrics and results.
 
-#         if "text" not in transcribed_data:
-#             logger.error("Missing transcription text in diarization")
-#             raise_transcription_error()
+    """
+    try:
+        logger.info(f"Call diarization for file: {file.filename}")
+        transcribed_data = await get_transcription(file)
 
-#         segments = transcribed_data["segments"]
-#         transcript_for_diarization = [
-#             (seg["start"], seg["end"], seg["text"]) for seg in segments
-#         ]
+        if "text" not in transcribed_data:
+            logger.error("Missing transcription text in diarization")
+            raise_transcription_error()
 
-#         diarized_segments = diarization_analyzer.perform_diarization(file)
-#         diarized_with_roles = diarization_analyzer.assign_roles_with_context(
-#             diarized_segments, transcript_for_diarization,
-#         )
-#         diarization_metrics = diarization_analyzer.calculate_metrics(
-#             diarized_with_roles,
-#         )
-#     except (ValueError, KeyError) as e:
-#         logger.exception("Diarization failed")
-#         raise HTTPException(status_code=500, detail="Diarization error") from e
-#     return {"diarization_metrics": diarization_metrics}
+        segments = transcribed_data["segments"]
+        transcript_for_diarization = [
+            (seg["start"], seg["end"], seg["text"]) for seg in segments
+        ]
+
+        diarized_segments = diarization_analyzer.perform_diarization(file)
+        diarized_with_roles = diarization_analyzer.assign_roles_with_context(
+            diarized_segments,
+            transcript_for_diarization,
+        )
+        diarization_metrics = diarization_analyzer.calculate_metrics(
+            diarized_with_roles,
+        )
+    except (ValueError, KeyError) as e:
+        logger.exception("Diarization failed")
+        raise HTTPException(status_code=500, detail="Diarization error") from e
+    return {"diarization_metrics": diarization_metrics}
