@@ -1,0 +1,19 @@
+categories:
+  returns:
+    - "return"
+    - "refund"
+    - "exchange"
+  technical_support:
+    - "issue"
+    - "error"
+    - "fix"
+    - "problem"
+  billing:
+    - "bill"
+    - "payment"
+    - "invoice"
+    - "charge"
+  general:
+    - "help"
+    - "assist"
+    - "support"
