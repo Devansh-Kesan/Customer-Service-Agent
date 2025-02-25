@@ -88,10 +88,15 @@ Use the Swagger UI to test the API endpoints.
 ### Step 5: Test Endpoints
 - Upload an audio file to the `/analyze` endpoint for a complete analysis
 - Use specialized endpoints for specific functionalities:
+  - `/analyze` - all audio analysis, it includes all the endpoints
   - `/transcribe` - Audio transcription only
   - `/compliance` - Check for required phrases
   - `/profanity` - Detect and mask profanity
-  - And more...
+  - `/pii` - Check for profanity and sensitive information
+  - `/mask_transcript` - Give masked transcription
+  -`/sentiment_analysis`- Give sentiment analysis (positive , negative and neutral)
+  -`/categorization`- give call category
+  -`/diarization`- Measure customer-to-agent speaking ratio (agent should not dominate), detect excessive agent interruptions, and track time-to-first-token (TTFT) for agent responses
 
 ---
 
@@ -105,6 +110,7 @@ Use the Swagger UI to test the API endpoints.
   - PII and profanity masking
   - Sentiment analysis
   - Call categorization
+  - diarization
 
 ### 2. Check Logs
 - Verify logs are being sent to the logging server
