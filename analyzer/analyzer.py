@@ -1,4 +1,5 @@
 """Module for analyzing call compliance, sentiment, and other metrics."""
+
 import os
 from collections.abc import Callable
 from pathlib import Path
@@ -10,7 +11,6 @@ from loguru import logger
 from utils.yaml_loader import load_yaml
 
 from .compliance import ComplianceChecker
-
 from .diarization import DiarizationAnalyzer
 from .pii_profanity import SensitiveInfoDetector
 from .sentiment_speed import SentimentAnalyzer
@@ -22,15 +22,18 @@ load_dotenv(Path(__file__).parent.parent / ".env")
 
 def raise_value_error(message: str) -> Callable:
     """Create a function to raise a ValueError with the given message."""
+
     def _raise_error():
         raise ValueError(message)
+
     return _raise_error
 
 
 class CallComplianceAnalyzer:
     """A class to analyze call compliance, sentiment, speed, and categorization.
 
-    Attributes:
+    Attributes
+    ----------
         transcriber (Transcriber): Instance for transcription.
         compliance (ComplianceChecker): Instance for compliance checks.
         pii_detector (SensitiveInfoDetector): Instance for PII detection.
@@ -44,6 +47,7 @@ class CallComplianceAnalyzer:
         """Initialize the analyzer with optional YAML configuration.
 
         Args:
+        ----
             yaml_file (str | None): Path to the YAML configuration file.
 
         """
@@ -76,9 +80,11 @@ class CallComplianceAnalyzer:
         """Categorize a call based on its content.
 
         Args:
+        ----
             text (str): The transcribed text of the call.
 
         Returns:
+        -------
             str: The category of the call.
 
         """
@@ -110,11 +116,13 @@ class CallComplianceAnalyzer:
         compliance checking, and call categorization.
 
         Args:
+        ----
             audio_file (str): Path to the audio file.
             transcribed_text (dict[str, Any] | None): Pre-transcribed text (optional).
             transcription_status (str | None): Status of transcription.
 
         Returns:
+        -------
             dict[str, Any]: Analysis results including masked transcript,
                 detected phrases, compliance data, sentiment, and category.
 
@@ -146,7 +154,8 @@ class CallComplianceAnalyzer:
 
             compliance_markers = {
                 "disclaimers": self.compliance.get_time_markers(
-                    segments, self.compliance.disclaimers,
+                    segments,
+                    self.compliance.disclaimers,
                 ),
             }
 
@@ -175,4 +184,3 @@ class CallComplianceAnalyzer:
             return {"error": str(e)}
         else:
             return result
-
