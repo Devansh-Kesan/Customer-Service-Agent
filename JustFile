@@ -1,0 +1,23 @@
+set shell := ["bash", "-cu"]
+set dotenv-load
+
+default:
+    just --list
+
+# setup environment and install dependencies
+setup:
+    uv sync
+    pip install ffmpeg-python
+    echo "Setup complete with FFmpeg installed"
+
+# start fastapi server
+start-backend-server:
+    uv run start_server.py
+
+# start logging server
+start-logging-server:
+    uv run logging_server.py
+
+# start frontend server
+start-frontend-server:
+    uv run frontend.py
