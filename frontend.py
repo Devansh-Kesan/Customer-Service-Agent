@@ -33,6 +33,8 @@ def analyze_call(audio_file_path: str, analysis_options: list[str]) -> list[str]
         features.add("mask_transcript")
     if "Sentiment Analysis" in analysis_options:
         features.add("sentiment_analysis")
+    if "Call Category" in analysis_options:
+        features.add("categorization")
 
     results = {}
     with Path(audio_file_path).open("rb") as audio_file:
@@ -63,6 +65,11 @@ def analyze_call(audio_file_path: str, analysis_options: list[str]) -> list[str]
             response = httpx.post(f"{BASE_URL}/sentiment_analysis", files=files,
                                    timeout=300)
             results["sentiment"] = response.json()
+
+        if "categorization" in features:
+            response = httpx.post(f"{BASE_URL}/categorization", files=files,
+                                  timeout=300)
+            results["categorization"] = response.json()
 
     return format_results(results, analysis_options)
 
@@ -117,6 +124,11 @@ def format_results(results: dict[str, dict], analysis_options: list[str]) -> lis
             f"Label: {sentiment.get('label', '')}\nScore: {sentiment.get('score', '')}"
         )
 
+    # Call Category
+    if "Call Category" in analysis_options:
+        call_category_data = results.get("categorization", {})
+        formatted[8] = "".join(results.get("categorization", {}).get("Call_Category", []))
+        
     return formatted
 
 iface = gr.Interface(
@@ -134,6 +146,7 @@ iface = gr.Interface(
                 "Detected PII",
                 "Detected Profanity",
                 "Sentiment Analysis",
+                "Call Category"
             ],
         ),
     ],
@@ -146,6 +159,7 @@ iface = gr.Interface(
         gr.Textbox(label="Detected PII"),
         gr.Textbox(label="Detected Profanity"),
         gr.Textbox(label="Sentiment Analysis"),
+        gr.Textbox(label="Call Category")
     ],
     title="Call Compliance Analyzer",
     description="Analyze audio calls for compliance, PII, and quality metrics",
