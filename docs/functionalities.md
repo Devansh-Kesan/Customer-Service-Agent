@@ -94,9 +94,9 @@ Use the Swagger UI to test the API endpoints.
   - `/profanity` - Detect and mask profanity
   - `/pii` - Check for profanity and sensitive information
   - `/mask_transcript` - Give masked transcription
-  -`/sentiment_analysis`- Give sentiment analysis (positive , negative and neutral)
-  -`/categorization`- give call category
-  -`/diarization`- Measure customer-to-agent speaking ratio (agent should not dominate), detect excessive agent interruptions, and track time-to-first-token (TTFT) for agent responses
+  - `/sentiment_analysis`- Give sentiment analysis (positive , negative and neutral)
+  - `/categorization`- give call category
+  - `/diarization`- Measure customer-to-agent speaking ratio (agent should not dominate), detect excessive agent interruptions, and track time-to-first-token (TTFT) for agent responses
 
 ---
 
