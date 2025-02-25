@@ -35,6 +35,8 @@ def analyze_call(audio_file_path: str, analysis_options: list[str]) -> list[str]
         features.add("sentiment_analysis")
     if "Call Category" in analysis_options:
         features.add("categorization")
+    if "Diarization" in analysis_options:
+        features.add("diarization")
 
     results = {}
     with Path(audio_file_path).open("rb") as audio_file:
@@ -71,6 +73,11 @@ def analyze_call(audio_file_path: str, analysis_options: list[str]) -> list[str]
                                   timeout=300)
             results["categorization"] = response.json()
 
+        if "diarization" in features:
+            response = httpx.post(f"{BASE_URL}/diarization", files=files,
+                                  timeout=1000)
+            results["diarization"] = response.json()
+
     return format_results(results, analysis_options)
 
 def format_results(results: dict[str, dict], analysis_options: list[str]) -> list[str]:
@@ -84,7 +91,7 @@ def format_results(results: dict[str, dict], analysis_options: list[str]) -> lis
         List[str]: Formatted results for each selected analysis option.
 
     """
-    formatted = [""] * 9  # Initialize empty results for all possible outputs
+    formatted = [""] * 10  # Initialize empty results for all possible outputs
 
     # Transcript
     if "Transcript" in analysis_options:
@@ -127,9 +134,18 @@ def format_results(results: dict[str, dict], analysis_options: list[str]) -> lis
     # Call Category
     if "Call Category" in analysis_options:
         call_category_data = results.get("categorization", {})
-        formatted[8] = "".join(results.get("categorization", {}).get("Call_Category", []))
-        
+        formatted[8] = call_category_data.get("Call_Category", "")
+
+    # Diarization
+    if "Diarization" in analysis_options:
+        diarization_metrics = results.get("diarization", {}).get("diarization_metrics", {})
+        formatted_metrics = []
+        for metric, value in diarization_metrics.items():
+            formatted_metrics.append(f"{metric}: {value}")
+        formatted[9] = "\n".join(formatted_metrics)
+
     return formatted
+
 
 iface = gr.Interface(
     fn=analyze_call,
@@ -146,7 +162,8 @@ iface = gr.Interface(
                 "Detected PII",
                 "Detected Profanity",
                 "Sentiment Analysis",
-                "Call Category"
+                "Call Category",
+                "Diarization",
             ],
         ),
     ],
@@ -159,7 +176,8 @@ iface = gr.Interface(
         gr.Textbox(label="Detected PII"),
         gr.Textbox(label="Detected Profanity"),
         gr.Textbox(label="Sentiment Analysis"),
-        gr.Textbox(label="Call Category")
+        gr.Textbox(label="Call Category"),
+        gr.Textbox(label="Diarization"),
     ],
     title="Call Compliance Analyzer",
     description="Analyze audio calls for compliance, PII, and quality metrics",
