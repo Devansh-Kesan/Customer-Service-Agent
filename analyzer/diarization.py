@@ -17,13 +17,11 @@ class DiarizationAnalyzer:
         """Initialize the diarization pipeline.
 
         Args:
+        ----
             hf_token (str): Hugging Face authentication token
 
         """
         try:
-            print(1)
-            print(1)
-            print(1)
             logger.debug("Initializing DiarizationAnalyzer")
             self.pipeline = Pipeline.from_pretrained(
                 "pyannote/speaker-diarization-3.1",
@@ -38,9 +36,11 @@ class DiarizationAnalyzer:
         """Perform speaker diarization on an audio file.
 
         Args:
+        ----
             audio_file (str): Path to audio file
 
         Returns:
+        -------
             List of diarization segments with start/end times and speaker labels
 
         """
@@ -67,10 +67,12 @@ class DiarizationAnalyzer:
         """Assign agent/customer roles based on contextual phrases.
 
         Args:
+        ----
             diarized_segments: List of speaker segments from diarization
             transcript: List of transcript entries (start, end, text)
 
         Returns:
+        -------
             Segments with added 'role' field
 
         """
@@ -87,8 +89,10 @@ class DiarizationAnalyzer:
 
             unique_speakers = {seg["speaker"] for seg in diarized_segments}
             if len(unique_speakers) != EXPECTED_SPEAKERS:
-                msg = f"Expected {EXPECTED_SPEAKERS} speakers, " \
-      f"found {len(unique_speakers)}"
+                msg = (
+                    f"Expected {EXPECTED_SPEAKERS} speakers, "
+                    f"found {len(unique_speakers)}"
+                )
                 raise ValueError(msg)
 
             speaker_phrase_counts = {speaker: 0 for speaker in unique_speakers}
@@ -106,7 +110,9 @@ class DiarizationAnalyzer:
                         speaker_phrase_counts[speaker] += 1
 
             sorted_speakers = sorted(
-                speaker_phrase_counts, key=speaker_phrase_counts.get, reverse=True,
+                speaker_phrase_counts,
+                key=speaker_phrase_counts.get,
+                reverse=True,
             )
             role_mapping = {sorted_speakers[0]: "agent", sorted_speakers[1]: "customer"}
             for seg in diarized_segments:
@@ -125,9 +131,11 @@ class DiarizationAnalyzer:
         """Calculate conversation metrics from diarized segments.
 
         Args:
+        ----
             diarized_segments: Segments with role assignments
 
         Returns:
+        -------
             Dictionary of calculated metrics
 
         """
@@ -161,7 +169,8 @@ class DiarizationAnalyzer:
 
             agent_segments = [s for s in diarized_segments if s["role"] == "agent"]
             agent_speed = (
-                (agent_time * 60) / len(agent_segments) if agent_segments else 0.0)
+                (agent_time * 60) / len(agent_segments) if agent_segments else 0.0
+            )
             ratio = customer_time / agent_time if agent_time > 0 else float("inf")
             avg_ttft = np.mean(ttfts) if ttfts else 0.0
 
