@@ -1,14 +1,15 @@
-# """Customer Service API routes module.
+"""Customer Service API routes module.
 
-# This module defines the FastAPI routes for handling customer service-related tasks,
-# including transcription, compliance checks, sentiment analysis, and more.
-# """
+This module defines the FastAPI routes for handling customer service-related tasks,
+including transcription, compliance checks, sentiment analysis, and more.
+"""
 
 import hashlib
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+import aiofiles
 import toml
 import zmq
 from fastapi import FastAPI, HTTPException, UploadFile
@@ -81,7 +82,7 @@ def get_file_hash(file_data: bytes) -> str:
     """
     try:
         # logger.debug("Generating file hash")
-        return hashlib.md5(file_data).hexdigest()
+        return hashlib.sha256(file_data).hexdigest()
     except (TypeError, ValueError) as e:
         logger.exception("Failed to generate file hash")
         raise HTTPException(status_code=500, detail="Hash generation failed") from e
@@ -90,24 +91,34 @@ def raise_transcription_error() -> None:
     """Raise a standardized transcription error."""
     raise HTTPException(status_code=500, detail="Transcription failed")
 
-async def get_transcription(file: UploadFile):
-    """Retrieve transcription from cache or transcribe if not cached."""
+async def get_transcription(file: UploadFile) -> dict:
+    """Retrieve transcription from cache or transcribe if not cached.
+
+    Args:
+        file: The uploaded audio file.
+
+    Returns:
+        The transcription data.
+
+    Raises:
+        HTTPException: If transcription fails.
+
+    """
     file_data = await file.read()
     file_hash = get_file_hash(file_data)
 
     if file_hash in transcription_cache:
+        logger.debug("Cache hit for transcription")
         return transcription_cache[file_hash]
 
-    # Save file temporarily
-    audio_path = "temp_audio.mp3"
-    with open(audio_path, "wb") as f:
-        f.write(file_data)
+    logger.debug("Cache miss - transcribing new file")
+    async with aiofiles.open("temp_audio.mp3", "wb") as f:
+        await f.write(file_data)
 
-    transcribed_data = transcriber.transcribe(audio_path)
-
+    transcribed_data = transcriber.transcribe("temp_audio.mp3")
     transcription_cache[file_hash] = transcribed_data
+    logger.success("Transcription completed successfully")
     return transcribed_data
-
 
 @app.post("/analyze")
 async def analyze_call(file: UploadFile) -> dict:
@@ -125,8 +136,8 @@ async def analyze_call(file: UploadFile) -> dict:
 
     audio_path = "temp_audio.mp3"
     await file.seek(0)
-    with open(audio_path, "wb") as f:
-        f.write(await file.read())
+    async with aiofiles.open(audio_path, "wb") as f:
+        await f.write(await file.read())
 
     return analyzer.full_analysis(audio_path, transcribed_data, "Completed")
 
@@ -334,7 +345,7 @@ async def categorize_call(file: UploadFile) -> dict:
         raise HTTPException(
             status_code=500, detail="Categorization error",
         ) from e
-    return {"Call_Category" : result}
+    return {"Call_Category": result}
 
 # @app.post("/diarization")
 # async def diarize_call(file: UploadFile) -> dict:

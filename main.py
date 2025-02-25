@@ -1,20 +1,23 @@
+"""Call compliance analysis module for audio processing."""
+
 import sys
 
-from analyzer.analyzer import CallComplianceAnalyzer
-from config import LoggerConfig
 from loguru import logger
 from rich import box
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
+
+from analyzer.analyzer import CallComplianceAnalyzer
+from config import LoggerConfig
 from zmq_logger import zmq_logger
 
 # Initialize Rich console
 console = Console()
 
 
-def log_analysis_results(results: dict):
-    """Logs the analysis results using Rich formatting"""
+def log_analysis_results(results: dict) -> None:
+    """Log the analysis results using Rich formatting."""
     # Main title panel
     console.print(
         Panel("Call Compliance Analysis Results", style="bold cyan", box=box.DOUBLE),
@@ -32,8 +35,7 @@ def log_analysis_results(results: dict):
 
     # PII Section
     pii_table = Table(
-        title="Detected Personal Identifiable Information (PII)",
-        box=box.SIMPLE,
+        title="Detected Personal Identifiable Information (PII)", box=box.SIMPLE,
     )
     pii_table.add_column("Type", style="bold red")
     pii_table.add_column("Matches", style="yellow")
@@ -140,28 +142,29 @@ def log_analysis_results(results: dict):
 
 
 if __name__ == "__main__":
-    # Initialize the logger configuration (unchanged)
+    # Initialize the logger configuration
 
     LoggerConfig()
-    # Validate command-line arguments (unchanged)
-    if len(sys.argv) < 2:
-        logger.error("Usage: python main.py <hugging_face_token> <audio_file_path>")
+    # Validate command-line arguments
+    MIN_ARGS = 2
+    if len(sys.argv) < MIN_ARGS:
+        logger.error("Usage: python main.py <audio_file_path>")
         sys.exit(1)
     audio_file = sys.argv[1]
-    # Log startup message (unchanged)
+    # Log startup message
     zmq_logger.log("INFO", "Starting main process...")
     try:
-        # Initialize analyzer with HF token (unchanged)
+        # Initialize analyzer with HF token
         analyzer = CallComplianceAnalyzer()
 
-        # Perform analysis (unchanged)
+        # Perform analysis
         results = analyzer.full_analysis(audio_file)
 
         # Log results using Rich
         log_analysis_results(results)
         zmq_logger.log("INFO", "Analysis completed successfully")
 
-    except Exception as e:
+    except (OSError, ValueError, RuntimeError) as e:
         logger.exception(f"Analysis failed: {e!s}")
         zmq_logger.log("ERROR", f"Analysis failed: {e!s}")
         sys.exit(1)
