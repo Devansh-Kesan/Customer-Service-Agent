@@ -100,35 +100,35 @@ def log_analysis_results(results: dict) -> None:
         ),
     )
 
-    # # Diarization Metrics Section
-    # diarization = results.get("diarization_metrics", {})
-    # diarization_table = Table(title="Diarization Metrics", box=box.SIMPLE)
-    # diarization_table.add_column("Metric", style="bold yellow")
-    # diarization_table.add_column("Value", style="yellow")
+    # Diarization Metrics Section
+    diarization = results.get("diarization_metrics", {})
+    diarization_table = Table(title="Diarization Metrics", box=box.SIMPLE)
+    diarization_table.add_column("Metric", style="bold yellow")
+    diarization_table.add_column("Value", style="yellow")
 
-    # metrics = [
-    #     (
-    #         "Agent Speaking Speed",
-    #         f"{diarization.get('agent_speaking_speed_wpm', 'N/A')} WPM",
-    #     ),
-    #     (
-    #         "Customer/Agent Ratio",
-    #         diarization.get("customer_to_agent_speaking_ratio", "N/A"),
-    #     ),
-    #     ("Agent Interruptions", diarization.get("interruptions_by_agent", "N/A")),
-    #     ("Average TTFT", f"{diarization.get('average_ttft', 'N/A')}s"),
-    # ]
+    metrics = [
+        (
+            "Agent Speaking Speed",
+            f"{diarization.get('agent_speaking_speed_wpm', 'N/A')} WPM",
+        ),
+        (
+            "Customer/Agent Ratio",
+            diarization.get("customer_to_agent_speaking_ratio", "N/A"),
+        ),
+        ("Agent Interruptions", diarization.get("interruptions_by_agent", "N/A")),
+        ("Average TTFT", f"{diarization.get('average_ttft', 'N/A')}s"),
+    ]
 
-    # for metric, value in metrics:
-    #     diarization_table.add_row(metric, str(value))
+    for metric, value in metrics:
+        diarization_table.add_row(metric, str(value))
 
-    # console.print(
-    #     Panel(
-    #         diarization_table,
-    #         title="[bold]Diarization Metrics[/bold]",
-    #         border_style="yellow",
-    #     )
-    # )
+    console.print(
+        Panel(
+            diarization_table,
+            title="[bold]Diarization Metrics[/bold]",
+            border_style="yellow",
+        )
+    )
 
     # Call Category Section
     console.print(
