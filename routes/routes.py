@@ -5,6 +5,7 @@ including transcription, compliance checks, sentiment analysis, and more.
 """
 
 import hashlib
+import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -12,7 +13,6 @@ from pathlib import Path
 import aiofiles
 import toml
 import zmq
-import os
 from fastapi import FastAPI, HTTPException, UploadFile
 from loguru import logger
 
@@ -59,7 +59,6 @@ app = FastAPI(
     title=FASTAPI_CONFIG.get("title", "Customer Service API"),
     description=FASTAPI_CONFIG.get("description", ""),
     debug=FASTAPI_CONFIG.get("reload", False),
-    # lifespan=lifespan,
 )
 
 # Initialize analyzers and other components
@@ -90,7 +89,7 @@ def get_file_hash(file_data: bytes) -> str:
 
     """
     try:
-        # logger.debug("Generating file hash")
+        logger.debug("Generating file hash")
         return hashlib.sha256(file_data).hexdigest()
     except (TypeError, ValueError) as e:
         logger.exception("Failed to generate file hash")

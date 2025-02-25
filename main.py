@@ -127,7 +127,7 @@ def log_analysis_results(results: dict) -> None:
             diarization_table,
             title="[bold]Diarization Metrics[/bold]",
             border_style="yellow",
-        )
+        ),
     )
 
     # Call Category Section
