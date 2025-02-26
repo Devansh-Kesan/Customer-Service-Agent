@@ -394,31 +394,31 @@ async def diarize_call(file: UploadFile) -> dict:
     """Perform speaker diarization on the uploaded audio file.
 
     Args:
-    ----
         file: The uploaded audio file.
 
     Returns:
-    -------
         Diarization metrics and results.
 
     """
     try:
         logger.info(f"Call diarization for file: {file.filename}")
-        transcribed_data = await get_transcription(file)
 
-        if "text" not in transcribed_data:
-            logger.error("Missing transcription text in diarization")
-            raise_transcription_error()
+        file_data = await file.read()
+        file_hash = get_file_hash(file_data)
+        async with aiofiles.open("temp_audio.mp3", "wb") as f:
+            await f.write(file_data)
+
+        transcribed_data = transcriber.transcribe("temp_audio.mp3")
+        transcription_cache[file_hash] = transcribed_data
 
         segments = transcribed_data["segments"]
         transcript_for_diarization = [
             (seg["start"], seg["end"], seg["text"]) for seg in segments
         ]
 
-        diarized_segments = diarization_analyzer.perform_diarization(file)
+        diarized_segments = diarization_analyzer.perform_diarization("temp_audio.mp3")
         diarized_with_roles = diarization_analyzer.assign_roles_with_context(
-            diarized_segments,
-            transcript_for_diarization,
+            diarized_segments, transcript_for_diarization,
         )
         diarization_metrics = diarization_analyzer.calculate_metrics(
             diarized_with_roles,
