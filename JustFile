@@ -7,6 +7,10 @@ default:
 # setup environment and install dependencies
 setup:
     uv sync
+    uv pip uninstall torch torchaudio
+    uv pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+
+
 
 # start fastapi server
 start-backend-server:
