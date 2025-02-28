@@ -35,7 +35,6 @@ start-all:
     uv run frontend.py > frontend_server.log 2>&1 &
     @echo "All servers started! Check respective log files for details."
     @echo "To stop all servers, use: just stop-all"
-    uv run 
 
 # stop all servers
 stop-all:
