@@ -6,9 +6,12 @@ including transcription, compliance checks, sentiment analysis, and more.
 
 import hashlib
 import os
+import pickle
+import glob
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
+from datetime import datetime
 
 import aiofiles
 import toml
@@ -32,6 +35,71 @@ FASTAPI_CONFIG = config["fastapi"]
 # Initialize logging configuration first
 logger_config = LoggerConfig()
 context = zmq.Context()
+
+# Directory for saving pickle files
+PICKLE_DIR = Path(__file__).parent.parent / "data" / "saved_results"
+os.makedirs(PICKLE_DIR, exist_ok=True)
+
+
+async def save_pickle(data, prefix, file_id):
+    """Save data to a pickle file.
+    
+    Args:
+    ----
+        data: The data to save.
+        prefix: The prefix for the filename.
+        file_id: Unique identifier for the file.
+    
+    Returns:
+    -------
+        Path to the saved pickle file.
+    """
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"{prefix}_{file_id}_{timestamp}.pkl"
+    filepath = PICKLE_DIR / filename
+    
+    try:
+        async with aiofiles.open(filepath, "wb") as f:
+            await f.write(pickle.dumps(data))
+        logger.debug(f"Saved {prefix} data to {filepath}")
+        return filepath
+    except Exception as e:
+        logger.error(f"Failed to save pickle file: {e}")
+        return None
+
+
+async def load_pickle(prefix, file_id):
+    """Load data from the most recent pickle file for a given prefix and file_id.
+    
+    Args:
+    ----
+        prefix: The prefix for the filename.
+        file_id: Unique identifier for the file.
+    
+    Returns:
+    -------
+        The loaded data or None if no file is found.
+    """
+    pattern = str(PICKLE_DIR / f"{prefix}_{file_id}_*.pkl")
+    try:
+        # Find all matching files
+        files = sorted(glob.glob(pattern))
+        if not files:
+            logger.debug(f"No saved {prefix} data found for {file_id}")
+            return None
+            
+        # Get the most recent file (should be the last one when sorted)
+        latest_file = files[-1]
+        logger.debug(f"Found saved {prefix} data: {latest_file}")
+        
+        # Load the data
+        async with aiofiles.open(latest_file, "rb") as f:
+            data = pickle.loads(await f.read())
+        logger.debug(f"Loaded {prefix} data from {latest_file}")
+        return data
+    except Exception as e:
+        logger.error(f"Failed to load pickle file: {e}")
+        return None
 
 
 @asynccontextmanager
@@ -102,7 +170,7 @@ def raise_transcription_error() -> None:
 
 
 async def get_transcription(file: UploadFile) -> dict:
-    """Retrieve transcription from cache or transcribe if not cached.
+    """Retrieve transcription from cache, pickled file, or transcribe if not available.
 
     Args:
     ----
@@ -119,17 +187,31 @@ async def get_transcription(file: UploadFile) -> dict:
     """
     file_data = await file.read()
     file_hash = get_file_hash(file_data)
-
+    file_id = file_hash[:8]
+    
+    # First check in-memory cache
     if file_hash in transcription_cache:
         logger.debug("Cache hit for transcription")
         return transcription_cache[file_hash]
-
-    logger.debug("Cache miss - transcribing new file")
+    
+    # Then check if we have a saved pickle
+    saved_transcription = await load_pickle("transcription", file_id)
+    if saved_transcription is not None:
+        logger.debug("Loaded transcription from pickle file")
+        transcription_cache[file_hash] = saved_transcription
+        return saved_transcription
+    
+    # If not in cache or pickle, process the file
+    logger.debug("No cached or saved transcription - transcribing new file")
     async with aiofiles.open("temp_audio.mp3", "wb") as f:
         await f.write(file_data)
 
     transcribed_data = transcriber.transcribe("temp_audio.mp3")
     transcription_cache[file_hash] = transcribed_data
+    
+    # Save transcription to pickle file
+    await save_pickle(transcribed_data, "transcription", file_id)
+    
     logger.success("Transcription completed successfully")
     return transcribed_data
 
@@ -147,6 +229,18 @@ async def analyze_call(file: UploadFile) -> dict:
         dict: Analysis results including compliance and categorization.
 
     """
+    # Get file hash for checking saved results
+    file_data = await file.read()
+    file_hash = get_file_hash(file_data)
+    file_id = file_hash[:8]
+    
+    # Check if analysis results are already saved
+    saved_analysis = await load_pickle("analysis", file_id)
+    if saved_analysis is not None:
+        logger.debug(f"Using saved analysis results for {file_id}")
+        return saved_analysis
+    
+    # If not saved, perform the analysis
     await file.seek(0)
     transcribed_data = await get_transcription(file)
 
@@ -155,7 +249,12 @@ async def analyze_call(file: UploadFile) -> dict:
     async with aiofiles.open(audio_path, "wb") as f:
         await f.write(await file.read())
 
-    return analyzer.full_analysis(audio_path, transcribed_data, "Completed")
+    analysis_result = analyzer.full_analysis(audio_path, transcribed_data, "Completed")
+    
+    # Save analysis result to pickle file
+    await save_pickle(analysis_result, "analysis", file_id)
+    
+    return analysis_result
 
 
 @app.post("/transcribe")
@@ -173,7 +272,8 @@ async def transcribe_call(file: UploadFile) -> dict:
     """
     try:
         logger.info(f"Transcription request for file: {file.filename}")
-        return await get_transcription(file)
+        result = await get_transcription(file)
+        return result
     except (OSError, ValueError) as e:
         logger.exception("Transcription endpoint failed")
         raise HTTPException(status_code=500, detail="Transcription failed") from e
@@ -194,7 +294,19 @@ async def check_compliance(file: UploadFile) -> dict:
 
     """
     try:
+        # Get file hash for checking saved results
+        file_data = await file.read()
+        file_hash = get_file_hash(file_data)
+        file_id = file_hash[:8]
+        
+        # Check if compliance results are already saved
+        saved_compliance = await load_pickle("compliance", file_id)
+        if saved_compliance is not None:
+            logger.debug(f"Using saved compliance results for {file_id}")
+            return saved_compliance
+        
         logger.info(f"Compliance check for file: {file.filename}")
+        await file.seek(0)
         transcribed_data = await get_transcription(file)
 
         if "text" not in transcribed_data:
@@ -220,6 +332,10 @@ async def check_compliance(file: UploadFile) -> dict:
         }
 
         logger.debug(f"Compliance results: {len(detected)} items found")
+        
+        # Save compliance check results
+        await save_pickle(detected, "compliance", file_id)
+        
     except (ValueError, KeyError) as e:
         logger.exception("Compliance check failed")
         raise HTTPException(
@@ -243,7 +359,19 @@ async def check_profanity(file: UploadFile) -> dict:
 
     """
     try:
+        # Get file hash for checking saved results
+        file_data = await file.read()
+        file_hash = get_file_hash(file_data)
+        file_id = file_hash[:8]
+        
+        # Check if profanity results are already saved
+        saved_profanity = await load_pickle("profanity", file_id)
+        if saved_profanity is not None:
+            logger.debug(f"Using saved profanity results for {file_id}")
+            return saved_profanity
+        
         logger.info(f"Profanity check for file: {file.filename}")
+        await file.seek(0)
         transcribed_data = await get_transcription(file)
 
         if "text" not in transcribed_data:
@@ -252,6 +380,11 @@ async def check_profanity(file: UploadFile) -> dict:
 
         result = pii_detector.detect_profanity(transcribed_data["text"])
         logger.debug(f"Found {len(result)} profane words")
+        
+        # Save profanity check results
+        profanity_result = {"Profanity": result}
+        await save_pickle(profanity_result, "profanity", file_id)
+        
     except (ValueError, KeyError) as e:
         logger.exception("Profanity check failed")
         raise HTTPException(
@@ -275,7 +408,19 @@ async def check_pii(file: UploadFile) -> dict:
 
     """
     try:
+        # Get file hash for checking saved results
+        file_data = await file.read()
+        file_hash = get_file_hash(file_data)
+        file_id = file_hash[:8]
+        
+        # Check if PII results are already saved
+        saved_pii = await load_pickle("pii", file_id)
+        if saved_pii is not None:
+            logger.debug(f"Using saved PII results for {file_id}")
+            return saved_pii
+            
         logger.info(f"PII check for file: {file.filename}")
+        await file.seek(0)
         transcribed_data = await get_transcription(file)
 
         if "text" not in transcribed_data:
@@ -284,6 +429,10 @@ async def check_pii(file: UploadFile) -> dict:
 
         result = pii_detector.find_pii(transcribed_data["text"])
         logger.debug(f"Found PII in {len(result)} categories")
+        
+        # Save PII check results
+        await save_pickle(result, "pii", file_id)
+        
     except (ValueError, KeyError) as e:
         logger.exception("PII check failed")
         raise HTTPException(status_code=500, detail="PII check error") from e
@@ -304,7 +453,19 @@ async def masked_transcript(file: UploadFile) -> dict:
 
     """
     try:
+        # Get file hash for checking saved results
+        file_data = await file.read()
+        file_hash = get_file_hash(file_data)
+        file_id = file_hash[:8]
+        
+        # Check if masked transcript is already saved
+        saved_masked = await load_pickle("masked", file_id)
+        if saved_masked is not None:
+            logger.debug(f"Using saved masked transcript for {file_id}")
+            return saved_masked
+            
         logger.info(f"Masking transcript for file: {file.filename}")
+        await file.seek(0)
         transcribed_data = await get_transcription(file)
 
         if "text" not in transcribed_data:
@@ -320,12 +481,17 @@ async def masked_transcript(file: UploadFile) -> dict:
         profane = {"profane": profanity}
         masked_text = pii_detector.mask_content(transcribed_text, profane)
         masked_text = pii_detector.mask_content(masked_text, pii)
-
+        
+        result = {"masked_text": masked_text}
+        
+        # Save masked transcript
+        await save_pickle(result, "masked", file_id)
+        
         logger.success("Masking completed successfully")
     except (ValueError, KeyError) as e:
         logger.exception("Transcript masking failed")
         raise HTTPException(status_code=500, detail="Masking error") from e
-    return {"masked_text": masked_text}
+    return result
 
 
 @app.post("/sentiment_analysis")
@@ -342,7 +508,19 @@ async def sentiment_analysis(file: UploadFile) -> dict:
 
     """
     try:
+        # Get file hash for checking saved results
+        file_data = await file.read()
+        file_hash = get_file_hash(file_data)
+        file_id = file_hash[:8]
+        
+        # Check if sentiment analysis results are already saved
+        saved_sentiment = await load_pickle("sentiment", file_id)
+        if saved_sentiment is not None:
+            logger.debug(f"Using saved sentiment analysis for {file_id}")
+            return saved_sentiment
+            
         logger.info(f"Sentiment analysis for file: {file.filename}")
+        await file.seek(0)
         transcribed_data = await get_transcription(file)
 
         if "text" not in transcribed_data:
@@ -351,6 +529,10 @@ async def sentiment_analysis(file: UploadFile) -> dict:
 
         result = sentiment_analyzer.analyze(transcribed_data["text"])
         logger.debug(f"Sentiment result: {result}")
+        
+        # Save sentiment analysis results
+        await save_pickle(result, "sentiment", file_id)
+        
     except (ValueError, KeyError) as e:
         logger.exception("Sentiment analysis failed")
         raise HTTPException(
@@ -374,7 +556,19 @@ async def categorize_call(file: UploadFile) -> dict:
 
     """
     try:
+        # Get file hash for checking saved results
+        file_data = await file.read()
+        file_hash = get_file_hash(file_data)
+        file_id = file_hash[:8]
+        
+        # Check if categorization results are already saved
+        saved_category = await load_pickle("category", file_id)
+        if saved_category is not None:
+            logger.debug(f"Using saved categorization for {file_id}")
+            return saved_category
+            
         logger.info(f"Call categorization for file: {file.filename}")
+        await file.seek(0)
         transcribed_data = await get_transcription(file)
 
         if "text" not in transcribed_data:
@@ -383,6 +577,11 @@ async def categorize_call(file: UploadFile) -> dict:
 
         result = analyzer.categorize_call(transcribed_data["text"])
         logger.debug(f"Categorization result: {result}")
+        
+        # Save categorization results
+        category_result = {"Call_Category": result}
+        await save_pickle(category_result, "category", file_id)
+        
     except (ValueError, KeyError) as e:
         logger.exception("Categorization failed")
         raise HTTPException(
@@ -404,15 +603,31 @@ async def diarize_call(file: UploadFile) -> dict:
 
     """
     try:
-        logger.info(f"Call diarization for file: {file.filename}")
-
+        # Get file hash for checking saved results
         file_data = await file.read()
         file_hash = get_file_hash(file_data)
+        file_id = file_hash[:8]
+        
+        # Check if diarization results are already saved
+        saved_diarization = await load_pickle("diarization", file_id)
+        if saved_diarization is not None:
+            logger.debug(f"Using saved diarization for {file_id}")
+            return {"diarization_metrics": saved_diarization["diarization_metrics"]}
+        
+        logger.info(f"Call diarization for file: {file.filename}")
+        await file.seek(0)
+        
         async with aiofiles.open("temp_audio.mp3", "wb") as f:
             await f.write(file_data)
 
-        transcribed_data = transcriber.transcribe("temp_audio.mp3")
-        transcription_cache[file_hash] = transcribed_data
+        # Reuse transcription if available
+        if file_hash in transcription_cache:
+            transcribed_data = transcription_cache[file_hash]
+        else:
+            transcribed_data = transcriber.transcribe("temp_audio.mp3")
+            transcription_cache[file_hash] = transcribed_data
+            # Save transcription if not already saved
+            await save_pickle(transcribed_data, "transcription", file_id)
 
         segments = transcribed_data["segments"]
         transcript_for_diarization = [
@@ -426,6 +641,17 @@ async def diarize_call(file: UploadFile) -> dict:
         diarization_metrics = diarization_analyzer.calculate_metrics(
             diarized_with_roles,
         )
+        
+        # Save all diarization results
+        full_diarization_results = {
+            "diarized_segments": diarized_segments,
+            "diarized_with_roles": diarized_with_roles,
+            "diarization_metrics": diarization_metrics
+        }
+        
+        await save_pickle(full_diarization_results, "diarization", file_id)
+        logger.debug(f"Saved diarization data for file hash: {file_id}")
+        
     except (ValueError, KeyError) as e:
         logger.exception("Diarization failed")
         raise HTTPException(status_code=500, detail="Diarization error") from e
