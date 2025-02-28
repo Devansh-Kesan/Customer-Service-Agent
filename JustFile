@@ -26,6 +26,9 @@ start-frontend-server:
 
 # start all servers (in background with proper logging)
 start-all:
+    @echo "Validating the configuation ..."
+    uv run validate/validate.py
+    @echo "Succesfully Validated the configuration ..."
     @echo "Starting all servers..."
     @echo "Starting logging server..."
     uv run logging_server.py > logging_server.log 2>&1 &
